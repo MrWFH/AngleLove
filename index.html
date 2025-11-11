@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"
+    />
+    <title>AngleLove</title>
+    <link rel="stylesheet" href="index.css" />
+    <link rel="preload" href="music.ogg" as="audio" />
+  </head>
+  <body>
+    <audio id="bg-music" src="music.ogg" preload="auto" loop></audio>
+    <div class="petal-container" aria-hidden="true"></div>
+
+    <section class="lock-screen active" aria-label="解锁画面">
+      <div class="lock-orbit">
+        <div class="heart-bloom"></div>
+        <div class="heart-lock">
+          <div class="lock-body"></div>
+          <div class="lock-shackle"></div>
+          <div class="lock-shine"></div>
+        </div>
+      </div>
+      <button class="unlock-button" type="button" aria-label="解锁惊喜">
+        ❤️ 轻触解锁专属惊喜 ❤️
+      </button>
+      <p class="hint">轻轻点击，开启爱的篇章</p>
+    </section>
+
+    <main class="main-content" aria-live="polite">
+      <header class="hero">
+        <div class="hero-badge" aria-hidden="true"></div>
+        <h1 class="hero-title"></h1>
+        <p class="hero-subtitle"></p>
+      </header>
+
+      <section class="carousel-section" aria-label="合照轮播">
+        <div class="carousel">
+          <div class="carousel-track"></div>
+          <div class="carousel-dots" role="tablist"></div>
+          <div class="carousel-shadow" aria-hidden="true"></div>
+        </div>
+        <p class="carousel-tip">左右滑动切换记忆 | 长按查看当时的小故事</p>
+      </section>
+
+      <section class="timeline-section" aria-label="专属时间轴">
+        <h2>我们的时光</h2>
+        <ol class="timeline"></ol>
+      </section>
+
+      <section class="letter-section" aria-label="情书">
+        <header>
+          <h2>写给你的话</h2>
+          <p class="letter-tip">上下滑动翻页 · 翻到最后有惊喜</p>
+        </header>
+        <div class="letter-book">
+          <div class="letter-pages"></div>
+          <div class="page-indicator"></div>
+        </div>
+      </section>
+
+      <section class="interaction-section" aria-label="互动按钮">
+        <button class="pulse-button" type="button">💓 发送心跳</button>
+        <button class="hug-button" type="button">🤗 拥抱你</button>
+      </section>
+
+      <footer class="footer">
+        <p class="footer-tip">轻触星星寻找彩蛋</p>
+        <div class="footer-stars" role="button" tabindex="0" aria-label="隐藏彩蛋">
+          <span>★</span>
+          <span>★</span>
+          <span>★</span>
+        </div>
+        <p class="footer-secret" hidden>其实我每天都在想你</p>
+      </footer>
+    </main>
+
+    <div class="modal story-modal" role="dialog" aria-modal="true" hidden>
+      <div class="modal-content">
+        <button class="modal-close" type="button" aria-label="关闭故事">×</button>
+        <h3>小故事</h3>
+        <p class="modal-body"></p>
+      </div>
+    </div>
+
+    <div class="modal countdown-modal" role="dialog" aria-modal="true" hidden>
+      <div class="modal-content">
+        <button class="modal-close" type="button" aria-label="关闭倒计时">×</button>
+        <h3>我们的时光</h3>
+        <p class="modal-body"></p>
+      </div>
+    </div>
+
+    <div class="toast" role="status" aria-live="assertive" hidden></div>
+
+    <div class="hug-overlay left" aria-hidden="true"></div>
+    <div class="hug-overlay right" aria-hidden="true"></div>
+
+    <script type="module" src="index.js"></script>
+  </body>
+</html>

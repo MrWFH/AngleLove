@@ -13,6 +13,7 @@
   <body>
     <audio id="bg-music" src="music.ogg" preload="auto" loop></audio>
     <div class="petal-container" aria-hidden="true"></div>
+    <img class="guajian-fixed" src="./image/guajian.gif" alt="甜蜜挂件" />
 
     <section class="lock-screen active" aria-label="解锁画面">
       <div class="lock-orbit">
@@ -31,8 +32,22 @@
 
     <main class="main-content" aria-live="polite">
       <header class="hero">
-        <div class="hero-badge" aria-hidden="true"></div>
-        <h1 class="hero-title"></h1>
+        <div class="hero-badge">
+          <img
+            class="hero-avatar"
+            src="./image/avatar.jpg"
+            alt="我们的专属头像"
+          />
+        </div>
+        <div class="hero-name-wrapper">
+          <img
+            class="hero-name-decoration"
+            src="./image/love2.gif"
+            alt="爱意陪伴"
+            aria-hidden="true"
+          />
+          <h1 class="hero-title"></h1>
+        </div>
         <p class="hero-subtitle"></p>
       </header>
 
@@ -72,6 +87,8 @@
           <span>★</span>
           <span>★</span>
           <span>★</span>
+          <span>★</span>
+          <span>★</span>
         </div>
         <p class="footer-secret" hidden>其实我每天都在想你</p>
       </footer>
@@ -94,6 +111,18 @@
     </div>
 
     <div class="toast" role="status" aria-live="assertive" hidden></div>
+
+    <div class="aixin-overlay" hidden>
+      <img src="./image/love.gif" alt="爱意传递中" />
+    </div>
+
+    <div class="flower-overlay" hidden>
+      <img src="./image/flower.gif" alt="花朵为你绽放" />
+    </div>
+
+    <div class="hug-overlay-modal" hidden>
+      <img src="./image/give.gif" alt="大大的拥抱送给你" />
+    </div>
 
     <div class="hug-overlay left" aria-hidden="true"></div>
     <div class="hug-overlay right" aria-hidden="true"></div>

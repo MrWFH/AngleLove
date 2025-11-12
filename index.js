@@ -2,6 +2,7 @@ const config = {
   herName: "安琪",
   titleSymbol: "❀",
   tagline: "从遇见你开始，星辰都变得温柔",
+  carouselInterval: 2000,
   theme: {
     primary: "#f3a6c4",
     secondary: "#c9b6ff",
@@ -49,12 +50,11 @@ const config = {
     }
   ],
   letters: [
-    `我以为我早就忘了你，直到我在人群中一眼就认出了你。`,
     `提笔想写点什么给你，却发现千言万语都不足以表达我的心意。`,
-    `未来很长，但我知道每一个明天都有你陪伴。愿我永远是你疲惫时的港湾，快乐时的伙伴，失落时的依靠。`,
-    `翻到这里的时候，花瓣会为我们落下。谢谢你选择我，让我有机会把世界上最真诚的爱给你。`
+    `💕我们在不同风景，相同时光里。`,
+    `我总是想把我看到的，一切美好的东西都当做礼物送给你`
   ],
-  signature: "你猜我是谁"
+  signature: "Mr.Wang"
 };
 
 const state = {
@@ -64,10 +64,21 @@ const state = {
   longPressTimer: null,
   currentPage: 0,
   unlockComplete: false,
-  footerTapCount: 0,
-  footerTapTimer: null,
-  petalsActive: false
+  footerStarIndex: 0,
+  footerUnlocked: false,
+  petalsActive: false,
+  autoSlideTimer: null,
+  musicAwaitingUserInteraction: false,
+  aixinHideTimer: null,
+  flowerHideTimer: null,
+  hugHideTimer: null,
+  letterTypingTimer: null,
+  letterAutoTimer: null
 };
+
+const LETTER_TYPING_DELAY = 65;
+const LETTER_SIGNATURE_DELAY = 90;
+const LETTER_AUTO_ADVANCE_DELAY = 2000;
 
 const elements = {
   lockScreen: document.querySelector(".lock-screen"),
@@ -91,8 +102,17 @@ const elements = {
   footerStars: document.querySelector(".footer-stars"),
   footerSecret: document.querySelector(".footer-secret"),
   petalContainer: document.querySelector(".petal-container"),
-  bgMusic: document.querySelector("#bg-music")
+  bgMusic: document.querySelector("#bg-music"),
+  aixinOverlay: document.querySelector(".aixin-overlay"),
+  flowerOverlay: document.querySelector(".flower-overlay"),
+  flowerOverlayImage: document.querySelector(".flower-overlay img"),
+  hugOverlayModal: document.querySelector(".hug-overlay-modal"),
+  hugOverlayImage: document.querySelector(".hug-overlay-modal img")
 };
+
+elements.footerStarItems = elements.footerStars
+  ? Array.from(elements.footerStars.querySelectorAll("span"))
+  : [];
 
 const storyModalBody = elements.storyModal.querySelector(".modal-body");
 const countdownModalBody = elements.countdownModal.querySelector(".modal-body");
@@ -104,8 +124,11 @@ initTimeline();
 initLetters();
 initFooter();
 initModals();
+initAixinOverlay();
+initFlowerOverlay();
 initButtons();
 initUnlock();
+initBackgroundMusic();
 
 function applyTheme(theme) {
   if (!theme) return;
@@ -120,7 +143,9 @@ function applyTheme(theme) {
 function initHero() {
   elements.heroTitle.textContent = `${config.herName}❤️`;
   elements.heroSubtitle.textContent = config.tagline;
-  elements.heroBadge.textContent = config.titleSymbol ?? "♡";
+  if (!elements.heroBadge.querySelector(".hero-avatar")) {
+    elements.heroBadge.textContent = config.titleSymbol ?? "♡";
+  }
 }
 
 function initCarousel() {
@@ -137,6 +162,8 @@ function initCarousel() {
     const img = document.createElement("img");
     img.src = photo.src;
     img.alt = photo.caption || `我们的合照 ${index + 1}`;
+    img.setAttribute("draggable", "false");
+    img.addEventListener("contextmenu", preventImageContextMenu);
 
     const caption = document.createElement("div");
     caption.className = "carousel-caption";
@@ -146,19 +173,23 @@ function initCarousel() {
     slide.appendChild(caption);
     elements.carouselTrack.appendChild(slide);
 
-    const dot = document.createElement("button");
+    const dot = document.createElement("div");
     dot.className = "carousel-dot";
-    dot.type = "button";
+    dot.type = "div";
     dot.setAttribute("aria-label", `查看第 ${index + 1} 张照片`);
-    dot.addEventListener("click", () => goToSlide(index));
+    dot.addEventListener("click", () => {
+      goToSlide(index);
+      restartAutoSlide();
+    });
     elements.carouselDots.appendChild(dot);
 
     slide.addEventListener("pointerdown", (event) =>
       handlePointerDown(event, photo.story)
     );
-    slide.addEventListener("pointerup", clearLongPress);
-    slide.addEventListener("pointerleave", clearLongPress);
-    slide.addEventListener("pointercancel", clearLongPress);
+    slide.addEventListener("pointerup", handlePointerRelease);
+    slide.addEventListener("pointerleave", handlePointerRelease);
+    slide.addEventListener("pointercancel", handlePointerRelease);
+    slide.addEventListener("contextmenu", preventImageContextMenu);
   });
 
   const carousel = elements.carouselTrack.closest(".carousel");
@@ -167,9 +198,11 @@ function initCarousel() {
   carousel.addEventListener("touchend", handleTouchEnd);
 
   goToSlide(0);
+  startAutoSlide();
 }
 
 function handlePointerDown(event, story) {
+  clearAutoSlide();
   if (!story) return;
   clearLongPress();
   state.longPressTimer = window.setTimeout(() => {
@@ -184,7 +217,17 @@ function clearLongPress() {
   }
 }
 
+function handlePointerRelease() {
+  clearLongPress();
+  restartAutoSlide();
+}
+
+function preventImageContextMenu(event) {
+  event.preventDefault();
+}
+
 function handleTouchStart(event) {
+  clearAutoSlide();
   state.touchStartX = event.touches[0].clientX;
   state.touchDeltaX = 0;
 }
@@ -202,6 +245,7 @@ function handleTouchEnd() {
   }
   state.touchStartX = 0;
   state.touchDeltaX = 0;
+  restartAutoSlide();
 }
 
 function goToSlide(index) {
@@ -222,6 +266,38 @@ function goToSlide(index) {
     .forEach((dot, idx) => {
       dot.classList.toggle("active", idx === state.currentSlide);
     });
+}
+
+function startAutoSlide() {
+  clearAutoSlide();
+  const total = Array.isArray(config.photos) ? config.photos.length : 0;
+  if (total <= 1) return;
+  const interval = getCarouselInterval();
+  if (!interval || interval <= 0) return;
+  state.autoSlideTimer = window.setInterval(() => {
+    goToSlide(state.currentSlide + 1);
+  }, interval);
+}
+
+function clearAutoSlide() {
+  if (state.autoSlideTimer !== null) {
+    window.clearInterval(state.autoSlideTimer);
+    state.autoSlideTimer = null;
+  }
+}
+
+function restartAutoSlide() {
+  startAutoSlide();
+}
+
+function getCarouselInterval() {
+  const defaultInterval = 1000;
+  const value = Number(config.carouselInterval);
+  if (Number.isFinite(value)) {
+    if (value <= 0) return value;
+    return value;
+  }
+  return defaultInterval;
 }
 
 function initTimeline() {
@@ -277,6 +353,7 @@ function initTimeline() {
 
 function initLetters() {
   if (!Array.isArray(config.letters)) return;
+  if (!elements.letterPagesWrapper || !elements.pageIndicator) return;
   elements.letterPagesWrapper.innerHTML = "";
   elements.pageIndicator.innerHTML = "";
 
@@ -286,13 +363,17 @@ function initLetters() {
     page.dataset.index = index.toString();
 
     const paragraph = document.createElement("p");
-    paragraph.textContent = text.trim();
+    paragraph.className = "letter-content";
+    paragraph.dataset.fullText = text.trim();
+    paragraph.textContent = "";
     page.appendChild(paragraph);
 
     if (index === config.letters.length - 1) {
       const signature = document.createElement("p");
       signature.className = "letter-signature";
-      signature.textContent = config.signature;
+      signature.dataset.fullText = (config.signature ?? "").trim();
+      signature.textContent = "";
+      signature.hidden = true;
       page.appendChild(signature);
     }
 
@@ -345,12 +426,17 @@ function handleLetterWheel(event) {
 function goToPage(index) {
   const total = config.letters.length;
   if (total === 0) return;
+  clearLetterTimers();
   state.currentPage = Math.max(0, Math.min(index, total - 1));
 
   elements.letterPagesWrapper
     .querySelectorAll(".letter-page")
     .forEach((page, idx) => {
-      page.classList.toggle("active", idx === state.currentPage);
+      const isActive = idx === state.currentPage;
+      page.classList.toggle("active", isActive);
+      if (!isActive) {
+        resetLetterPageContent(page);
+      }
     });
 
   elements.pageIndicator
@@ -359,11 +445,122 @@ function goToPage(index) {
       dot.classList.toggle("active", idx === state.currentPage);
     });
 
+  startLetterTyping(state.currentPage);
+
   if (state.currentPage === total - 1 && !state.petalsActive) {
     state.petalsActive = true;
     launchPetalRain();
     showToast("花瓣为你飘落");
   }
+}
+
+function resetLetterPageContent(page) {
+  if (!page) return;
+  const content = page.querySelector(".letter-content");
+  if (content) {
+    content.textContent = "";
+  }
+  const signature = page.querySelector(".letter-signature");
+  if (signature) {
+    signature.textContent = "";
+    signature.hidden = true;
+  }
+}
+
+function startLetterTyping(index) {
+  clearLetterTypingTimer();
+  const total = config.letters.length;
+  if (total === 0) return;
+  if (!elements.letterPagesWrapper) return;
+  const page = elements.letterPagesWrapper.querySelector(`.letter-page[data-index="${index}"]`);
+  if (!page) {
+    scheduleLetterAutoAdvance(index);
+    return;
+  }
+
+  resetLetterPageContent(page);
+
+  const content = page.querySelector(".letter-content");
+  if (!content) {
+    scheduleLetterAutoAdvance(index);
+    return;
+  }
+
+  const fullText = content.dataset.fullText ?? "";
+  const chars = Array.from(fullText);
+  let charIndex = 0;
+
+  const typeNextChar = () => {
+    state.letterTypingTimer = null;
+    if (charIndex < chars.length) {
+      content.textContent += chars[charIndex];
+      charIndex += 1;
+      state.letterTypingTimer = window.setTimeout(typeNextChar, LETTER_TYPING_DELAY);
+      return;
+    }
+    typeSignature();
+  };
+
+  const typeSignature = () => {
+    const signatureEl = page.querySelector(".letter-signature");
+    if (!signatureEl) {
+      scheduleLetterAutoAdvance(index);
+      return;
+    }
+    const signatureText = signatureEl.dataset.fullText ?? "";
+    if (!signatureText) {
+      signatureEl.hidden = false;
+      scheduleLetterAutoAdvance(index);
+      return;
+    }
+    signatureEl.hidden = false;
+    const signatureChars = Array.from(signatureText);
+    let signatureIndex = 0;
+
+    const typeSignatureChar = () => {
+      state.letterTypingTimer = null;
+      if (signatureIndex < signatureChars.length) {
+        signatureEl.textContent += signatureChars[signatureIndex];
+        signatureIndex += 1;
+        state.letterTypingTimer = window.setTimeout(typeSignatureChar, LETTER_SIGNATURE_DELAY);
+        return;
+      }
+      scheduleLetterAutoAdvance(index);
+    };
+
+    typeSignatureChar();
+  };
+
+  typeNextChar();
+}
+
+function scheduleLetterAutoAdvance(index) {
+  const total = config.letters.length;
+  if (total <= 1) return;
+  clearLetterAutoTimer();
+  state.letterAutoTimer = window.setTimeout(() => {
+    state.letterAutoTimer = null;
+    goToPage((index + 1) % total);
+  }, LETTER_AUTO_ADVANCE_DELAY);
+}
+
+function clearLetterTypingTimer() {
+  if (state.letterTypingTimer !== null) {
+    clearTimeout(state.letterTypingTimer);
+    state.letterTypingTimer = null;
+  }
+}
+
+function clearLetterAutoTimer() {
+  if (state.letterAutoTimer !== null) {
+    clearTimeout(state.letterAutoTimer);
+    state.letterAutoTimer = null;
+  }
+}
+
+function clearLetterTimers() {
+  clearLetterTypingTimer();
+  clearLetterAutoTimer();
 }
 
 function initFooter() {
@@ -377,23 +574,28 @@ function initFooter() {
 }
 
 function handleFooterTap() {
-  state.footerTapCount += 1;
-  if (!state.footerTapTimer) {
-    state.footerTapTimer = window.setTimeout(resetFooterTap, 4000);
+  if (!elements.footerStarItems || elements.footerStarItems.length === 0) {
+    return;
   }
-  if (state.footerTapCount >= 5) {
-    resetFooterTap();
-    elements.footerSecret.hidden = false;
-    showToast("我一直在偷偷想你");
+  if (state.footerUnlocked) {
+    showToast("彩蛋已经点亮啦");
+    return;
   }
-}
-
-function resetFooterTap() {
-  state.footerTapCount = 0;
-  if (state.footerTapTimer) {
-    clearTimeout(state.footerTapTimer);
-    state.footerTapTimer = null;
+  const star = elements.footerStarItems[state.footerStarIndex];
+  if (!star) {
+    return;
   }
+  star.classList.add("lit");
+  state.footerStarIndex += 1;
+  const remaining = elements.footerStarItems.length - state.footerStarIndex;
+  if (remaining > 0) {
+    showToast(`再轻触 ${remaining} 次发现惊喜`);
+    return;
+  }
+  state.footerUnlocked = true;
+  elements.footerSecret.hidden = false;
+  showToast("我一直在偷偷想你");
+  showFlowerOverlay();
 }
 
 function initButtons() {
@@ -405,6 +607,7 @@ function handlePulse(event) {
   const button = event.currentTarget;
   playHeartbeatSound();
   createHeartWave(button);
+  showAixinOverlay();
   const originalText = button.textContent;
   button.textContent = "收到你的心跳啦";
   showToast("心跳同步中...");
@@ -425,6 +628,7 @@ function handleHug() {
   document.body.classList.add("hugging");
   showToast("给你温暖的拥抱");
   window.setTimeout(() => document.body.classList.remove("hugging"), 2400);
+  showHugOverlayModal();
 }
 
 function initModals() {
@@ -438,6 +642,16 @@ function initModals() {
       hideModal(modal);
     });
   });
+}
+
+function initAixinOverlay() {
+  if (!elements.aixinOverlay) return;
+  elements.aixinOverlay.addEventListener("click", hideAixinOverlay);
+}
+
+function initFlowerOverlay() {
+  if (!elements.flowerOverlay) return;
+  elements.flowerOverlay.addEventListener("click", hideFlowerOverlay);
 }
 
 function showStory(story) {
@@ -460,6 +674,36 @@ function initUnlock() {
   elements.unlockButton.addEventListener("click", handleUnlock);
 }
 
+function initBackgroundMusic() {
+  const audio = elements.bgMusic;
+  if (!audio) return;
+
+  const ensurePlayback = () => ensureBackgroundMusic();
+  const ensurePlaybackWithPrompt = () => ensureBackgroundMusic({ showPrompt: true });
+
+  audio.addEventListener("ended", ensurePlayback);
+  audio.addEventListener("stalled", ensurePlayback);
+  audio.addEventListener("suspend", () => window.setTimeout(ensurePlayback, 400));
+  audio.addEventListener("waiting", ensurePlayback);
+  audio.addEventListener("error", ensurePlaybackWithPrompt);
+  audio.addEventListener("pause", () => {
+    if (document.hidden || state.musicAwaitingUserInteraction) return;
+    window.setTimeout(() => {
+      if (!audio.paused && !audio.ended) return;
+      ensureBackgroundMusic();
+    }, 200);
+  });
+
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) {
+      ensureBackgroundMusic();
+    }
+  });
+
+  window.addEventListener("focus", ensurePlayback);
+  window.addEventListener("pageshow", ensurePlayback);
+}
+
 function handleUnlock() {
   if (state.unlockComplete) return;
   state.unlockComplete = true;
@@ -475,19 +719,45 @@ function handleUnlock() {
 }
 
 function playBackgroundMusic() {
+  ensureBackgroundMusic({ showPrompt: true });
+}
+
+function ensureBackgroundMusic(options = {}) {
+  const { showPrompt = false } = options;
   const audio = elements.bgMusic;
   if (!audio) return;
+
+  audio.loop = true;
+  audio.preload = "auto";
   audio.volume = 0.65;
-  audio.play().catch(() => {
-    showToast("轻触任意位置即可播放背景音乐");
+
+  if (!audio.paused && !audio.ended) {
+    state.musicAwaitingUserInteraction = false;
+    return;
+  }
+
+  const requestByGesture = () => {
+    if (state.musicAwaitingUserInteraction) return;
+    state.musicAwaitingUserInteraction = true;
     const resume = () => {
-      audio.play().catch(() => {});
-      document.removeEventListener("click", resume);
-      document.removeEventListener("touchstart", resume);
+      state.musicAwaitingUserInteraction = false;
+      ensureBackgroundMusic();
     };
     document.addEventListener("click", resume, { once: true });
     document.addEventListener("touchstart", resume, { once: true });
-  });
+  };
+
+  audio
+    .play()
+    .then(() => {
+      state.musicAwaitingUserInteraction = false;
+    })
+    .catch(() => {
+      if (showPrompt) {
+        showToast("轻触任意位置即可播放背景音乐");
+      }
+      requestByGesture();
+    });
 }
 
 function showModal(modal) {
@@ -496,6 +766,108 @@ function showModal(modal) {
 
 function hideModal(modal) {
   modal.hidden = true;
+}
+
+function showAixinOverlay() {
+  if (!elements.aixinOverlay) return;
+  clearAixinHideTimer();
+  elements.aixinOverlay.hidden = false;
+  requestAnimationFrame(() => {
+    elements.aixinOverlay.classList.add("show");
+  });
+  state.aixinHideTimer = window.setTimeout(() => {
+    hideAixinOverlay();
+  }, 3000);
+}
+
+function hideAixinOverlay() {
+  if (!elements.aixinOverlay) return;
+  clearAixinHideTimer();
+  elements.aixinOverlay.classList.remove("show");
+  window.setTimeout(() => {
+    if (!elements.aixinOverlay.classList.contains("show")) {
+      elements.aixinOverlay.hidden = true;
+    }
+  }, 280);
+}
+
+function clearAixinHideTimer() {
+  if (state.aixinHideTimer !== null) {
+    clearTimeout(state.aixinHideTimer);
+    state.aixinHideTimer = null;
+  }
+}
+
+function showFlowerOverlay() {
+  if (!elements.flowerOverlay) return;
+  clearFlowerHideTimer();
+  restartGif(elements.flowerOverlayImage);
+  elements.flowerOverlay.hidden = false;
+  requestAnimationFrame(() => {
+    elements.flowerOverlay.classList.add("show");
+  });
+  state.flowerHideTimer = window.setTimeout(() => {
+    hideFlowerOverlay();
+  }, 5000);
+}
+
+function hideFlowerOverlay() {
+  if (!elements.flowerOverlay) return;
+  clearFlowerHideTimer();
+  elements.flowerOverlay.classList.remove("show");
+  window.setTimeout(() => {
+    if (!elements.flowerOverlay.classList.contains("show")) {
+      elements.flowerOverlay.hidden = true;
+    }
+  }, 320);
+}
+
+function clearFlowerHideTimer() {
+  if (state.flowerHideTimer !== null) {
+    clearTimeout(state.flowerHideTimer);
+    state.flowerHideTimer = null;
+  }
+}
+
+function showHugOverlayModal() {
+  if (!elements.hugOverlayModal) return;
+  clearHugHideTimer();
+  restartGif(elements.hugOverlayImage);
+  elements.hugOverlayModal.hidden = false;
+  requestAnimationFrame(() => {
+    elements.hugOverlayModal.classList.add("show");
+  });
+  state.hugHideTimer = window.setTimeout(() => {
+    hideHugOverlayModal();
+  }, 3000);
+}
+
+function hideHugOverlayModal() {
+  if (!elements.hugOverlayModal) return;
+  clearHugHideTimer();
+  elements.hugOverlayModal.classList.remove("show");
+  window.setTimeout(() => {
+    if (!elements.hugOverlayModal.classList.contains("show")) {
+      elements.hugOverlayModal.hidden = true;
+    }
+  }, 280);
+}
+
+function clearHugHideTimer() {
+  if (state.hugHideTimer !== null) {
+    clearTimeout(state.hugHideTimer);
+    state.hugHideTimer = null;
+  }
+}
+
+function restartGif(image) {
+  if (!image) return;
+  const src = image.getAttribute("src");
+  if (!src) return;
+  image.setAttribute("src", "");
+  // 强制重绘以确保浏览器重新加载 GIF
+  void image.offsetWidth;
+  image.setAttribute("src", src);
 }
 
 function calculateDurationFrom(dateStr) {
